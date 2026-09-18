@@ -6,6 +6,7 @@
 <title>HD IN FOTO & VIDEO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script async src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie-segmentation@0.1/selfie_segmentation.js"></script>
 <style>
 :root{
   --mint:#3fe8a4;--mint2:#1fae74;
@@ -66,14 +67,51 @@ progress::-webkit-progress-value{background:var(--mint)}
 .mode-strip{display:flex;gap:22px;overflow-x:auto;padding:2px 24px;scrollbar-width:none}
 .mode-strip::-webkit-scrollbar{display:none}
 .mode-item{flex:none;font-family:'Quicksand',sans-serif;font-weight:600;font-size:13px;color:var(--dim);
-  padding:4px 2px;cursor:pointer;white-space:nowrap;transition:.15s;text-align:center}
+  padding:8px 16px;cursor:pointer;white-space:nowrap;transition:.2s;text-align:center;border-radius:20px;position:relative}
 .mode-item .b{display:block;font-size:9.5px;font-weight:500;opacity:.75;margin-top:1px}
-.mode-item.active{color:var(--mint);font-size:14.5px;transform:scale(1.05)}
+.mode-item.active{
+  color:#fff;font-size:14.5px;
+  background:linear-gradient(135deg, #ff3b30, #ff6b6b);
+  box-shadow:0 0 0 0 rgba(255, 59, 48, 0.7);
+  animation:bubble-pulse .6s ease-out;
+}
+@keyframes bubble-pulse {
+  0%{
+    box-shadow:0 0 0 0 rgba(255, 59, 48, 0.7);
+  }
+  70%{
+    box-shadow:0 0 0 10px rgba(255, 59, 48, 0);
+  }
+  100%{
+    box-shadow:0 0 0 0 rgba(255, 59, 48, 0);
+  }
+}
 .lens-row{display:flex;gap:8px;justify-content:center;padding:8px 0 2px}
-.lens-chip{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--glass2);
+.lens-chip{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--border);background:var(--glass2);
   color:var(--dim);font-family:'Quicksand',sans-serif;font-weight:700;font-size:11.5px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer}
-.lens-chip.active{background:linear-gradient(135deg,var(--mint),var(--mint2));color:#03210f;border-color:transparent}
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s;position:relative}
+.lens-chip.active{
+  background:linear-gradient(135deg, #ff3b30, #ff6b6b);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 0 0 0 rgba(255, 59, 48, 0.7);
+  animation:bubble-pulse .6s ease-out;
+}
+
+/* stabilizer control */
+.stabilizer-row{display:flex;gap:12px;justify-content:center;padding:10px 0 8px;align-items:center}
+.stab-chip{width:auto;padding:10px 20px;border-radius:24px;border:1.5px solid var(--border);
+  background:var(--glass2);color:var(--dim);font-family:'Quicksand',sans-serif;font-weight:600;font-size:12px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s;gap:6px;position:relative}
+.stab-chip .stab-icon{font-size:16px}
+.stab-chip .stab-label{letter-spacing:.3px}
+.stab-chip.active{
+  background:linear-gradient(135deg, #ff3b30, #ff6b6b);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 0 0 0 rgba(255, 59, 48, 0.7);
+  animation:bubble-pulse .6s ease-out;
+}
 
 /* bottom bar */
 .bottom-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 30px 22px}
@@ -118,7 +156,7 @@ input[type=file]{display:none}
   <div class="topbar">
     <div class="brand">HD IN <span>FOTO</span> & VIDEO</div>
     <div class="top-icons" id="topIcons">
-      <button class="icon-btn" id="stabIconBtn" title="Mode Stabilkan">🫳</button>
+      <button class="icon-btn" id="bgRemoveIconBtn" title="Hapus Background">✂️</button>
       <button class="icon-btn" id="hdrIconBtn" title="Mode HDR">HDR</button>
     </div>
   </div>
@@ -145,6 +183,12 @@ input[type=file]{display:none}
   <div class="mode-strip-wrap hidden" id="modeStripWrap">
     <div class="mode-strip" id="modeStrip"></div>
     <div class="lens-row hidden" id="lensRow"></div>
+    <div class="stabilizer-row hidden" id="stabilizerRow">
+      <button class="stab-chip" id="stabilizerChip">
+        <span class="stab-icon">🫳</span>
+        <span class="stab-label" id="stabLabel">Stabilizer</span>
+      </button>
+    </div>
   </div>
 
   <div class="bottom-bar hidden" id="bottomBar">
@@ -181,15 +225,28 @@ const HD_LEVELS = [
 ];
 const HD_FILTERS = {
   off:'none',
-  hd:'contrast(1.12) saturate(1.18) brightness(1.03)',
-  banget:'contrast(1.32) saturate(1.45) brightness(1.06)',
-  iphone:'contrast(1.2) saturate(1.3) brightness(1.05) hue-rotate(-2deg)'
+  hd:'contrast(1.22) saturate(1.12) brightness(0.98) hue-rotate(-0.5deg)',
+  banget:'contrast(1.48) saturate(1.18) brightness(0.96) hue-rotate(-1deg)',
+  iphone:'contrast(1.42) saturate(1.15) brightness(0.97) hue-rotate(-0.8deg)'
 };
-const SHARPEN_AMOUNT = {off:0, hd:0.35, banget:0.9, iphone:0.6};
-const HDR_FILTER = 'contrast(1.22) saturate(1.4) brightness(1.08)';
+const SHARPEN_AMOUNT = {off:0, hd:0.65, banget:1.4, iphone:1.2};
+const HDR_FILTER = 'contrast(1.38) saturate(1.25) brightness(1.01) hue-rotate(-0.5deg)';
 const LENS_SCALES = [0.5, 1, 1.5, 2, 3];
 
-let state = {mode:RES[0], stabilize:false, hdVideo:'off', hdrPhoto:false, hdPhoto:'off', photoScale:1, fileType:null, fileURL:null};
+let state = {mode:RES[0], stabilize:true, hdVideo:'banget', hdrPhoto:false, hdPhoto:'off', photoScale:1, bgRemove:false, fileType:null, fileURL:null};
+
+// Initialize MediaPipe Selfie Segmentation
+let selfieSegmentation = null;
+async function initSegmentation(){
+  if(!selfieSegmentation && typeof SelfieSegmentation !== 'undefined'){
+    selfieSegmentation = new SelfieSegmentation({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${file}`
+    });
+    selfieSegmentation.setOptions({
+      modelSelection: 1 // 1 untuk general version, 0 untuk landscape
+    });
+  }
+}
 
 const $ = id => document.getElementById(id);
 const dropzone=$('dropzone'), fileInput=$('fileInput'), pickBtn=$('pickBtn'), retakeBtn=$('retakeBtn');
@@ -197,9 +254,10 @@ const previewVideo=$('previewVideo'), previewImg=$('previewImg');
 const statusEl=$('status'), progressBar=$('progressBar');
 const resultVideo=$('resultVideo'), resultImg=$('resultImg'), downloadLink=$('downloadLink');
 const resultSheet=$('resultSheet'), closeSheet=$('closeSheet');
-const stabIconBtn=$('stabIconBtn'), hdrIconBtn=$('hdrIconBtn'), hdCycleBtn=$('hdCycleBtn'), hdCycleLabel=$('hdCycleLabel');
+const hdrIconBtn=$('hdrIconBtn'), hdCycleBtn=$('hdCycleBtn'), hdCycleLabel=$('hdCycleLabel');
 const modeStrip=$('modeStrip'), processBtn=$('processBtn'), lensRow=$('lensRow');
 const modeStripWrap=$('modeStripWrap'), bottomBar=$('bottomBar'), emptyBar=$('emptyBar'), galleryCtaBtn=$('galleryCtaBtn');
+const stabilizerRow=$('stabilizerRow'), stabilizerChip=$('stabilizerChip'), stabLabel=$('stabLabel');
 
 function updateLivePreview(){
   if(state.fileType==='video'){
@@ -207,6 +265,21 @@ function updateLivePreview(){
   } else if(state.fileType==='image'){
     const f=[HD_FILTERS[state.hdPhoto], state.hdrPhoto?HDR_FILTER:''].filter(x=>x&&x!=='none').join(' ')||'none';
     previewImg.style.filter = f;
+    
+    // Apply zoom/lens crop pada preview
+    const scale = state.photoScale;
+    if(scale < 1){
+      // Crop dari center untuk zoom out
+      const cropPercent = (1 - scale) * 50;
+      previewImg.style.objectPosition = 'center';
+      previewImg.style.objectFit = 'cover';
+      // Simulate crop dengan clip-path
+      const clipSize = scale * 100;
+      previewImg.style.clipPath = `inset(${(100-clipSize)/2}%)`;
+    } else {
+      previewImg.style.clipPath = 'none';
+      previewImg.style.objectFit = 'contain';
+    }
   }
 }
 function renderModeStrip(){
@@ -231,23 +304,28 @@ function renderModeStrip(){
       const chip=document.createElement('div');
       chip.className='lens-chip'+(sc===state.photoScale?' active':'');
       chip.textContent = sc<1 ? sc.toString().replace('0.','.') : sc+'x';
-      chip.onclick=()=>{ state.photoScale=sc; renderModeStrip(); };
+      chip.onclick=()=>{ state.photoScale=sc; renderModeStrip(); updateLivePreview(); };
       lensRow.appendChild(chip);
     });
+    stabilizerRow.classList.add('hidden');
+  } else if(state.fileType==='video'){
+    lensRow.classList.add('hidden');
+    stabilizerRow.classList.remove('hidden');
+    stabilizerChip.classList.toggle('active', state.stabilize);
+    stabLabel.textContent = state.stabilize ? 'Stabilizer ON' : 'Stabilizer';
   } else {
     lensRow.classList.add('hidden');
+    stabilizerRow.classList.add('hidden');
   }
   updateLivePreview();
 }
 function refreshTopIcons(){
-  if(state.fileType==='video'){
-    stabIconBtn.classList.remove('hidden'); hdrIconBtn.classList.add('hidden');
-    stabIconBtn.classList.toggle('on', state.stabilize);
-  } else if(state.fileType==='image'){
-    hdrIconBtn.classList.remove('hidden'); stabIconBtn.classList.add('hidden');
+  bgRemoveIconBtn.classList.toggle('on', state.bgRemove);
+  if(state.fileType==='image'){
+    hdrIconBtn.classList.remove('hidden');
     hdrIconBtn.classList.toggle('on', state.hdrPhoto);
   } else {
-    stabIconBtn.classList.add('hidden'); hdrIconBtn.classList.add('hidden');
+    hdrIconBtn.classList.add('hidden');
   }
 }
 function refreshHdCycle(){
@@ -258,7 +336,9 @@ function refreshHdCycle(){
     hdCycleBtn.classList.add('hidden');
   }
 }
-stabIconBtn.onclick=()=>{ state.stabilize=!state.stabilize; refreshTopIcons(); };
+const bgRemoveIconBtn=$('bgRemoveIconBtn');
+bgRemoveIconBtn.onclick=()=>{ state.bgRemove=!state.bgRemove; refreshTopIcons(); updateLivePreview(); };
+stabilizerChip.onclick=()=>{ state.stabilize=!state.stabilize; stabilizerChip.classList.toggle('active', state.stabilize); stabLabel.textContent = state.stabilize ? 'Stabilizer ON' : 'Stabilizer'; };
 hdrIconBtn.onclick=()=>{ state.hdrPhoto=!state.hdrPhoto; refreshTopIcons(); updateLivePreview(); };
 hdCycleBtn.onclick=()=>{
   const idx=HD_LEVELS.findIndex(x=>x.k===state.hdVideo);
@@ -316,6 +396,62 @@ processBtn.onclick=()=>{
 
 function setStatus(t){ statusEl.textContent=t; statusEl.classList.toggle('show', !!t); }
 
+function removeBackgroundFromCanvas(ctx, w, h){
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  
+  // Buat grayscale dan edge detection sederhana
+  const edges = new Uint8ClampedArray(w * h);
+  for(let i = 0; i < data.length; i += 4){
+    const r = data[i], g = data[i+1], b = data[i+2];
+    const gray = r * 0.299 + g * 0.587 + b * 0.114;
+    edges[Math.floor(i/4)] = gray;
+  }
+  
+  // Edge detection kernel
+  const result = new Uint8ClampedArray(data.length);
+  for(let y = 1; y < h - 1; y++){
+    for(let x = 1; x < w - 1; x++){
+      const idx = y * w + x;
+      const sobelX = -edges[(y-1)*w+(x-1)] - 2*edges[y*w+(x-1)] - edges[(y+1)*w+(x-1)] +
+                     edges[(y-1)*w+(x+1)] + 2*edges[y*w+(x+1)] + edges[(y+1)*w+(x+1)];
+      const sobelY = -edges[(y-1)*w+(x-1)] - 2*edges[(y-1)*w+x] - edges[(y-1)*w+(x+1)] +
+                     edges[(y+1)*w+(x-1)] + 2*edges[(y+1)*w+x] + edges[(y+1)*w+(x+1)];
+      const edge = Math.abs(sobelX) + Math.abs(sobelY);
+      const threshold = 100;
+      const isEdge = edge > threshold;
+      
+      // Dilate edge untuk menghubungkan area
+      let isObjectArea = isEdge;
+      if(!isObjectArea && y > 0 && y < h-1 && x > 0 && x < w-1){
+        const neighbors = [
+          edges[(y-1)*w+x], edges[(y+1)*w+x],
+          edges[y*w+(x-1)], edges[y*w+(x+1)]
+        ];
+        const avgNeighbor = neighbors.reduce((a,b)=>a+b)/4;
+        isObjectArea = avgNeighbor > 80;
+      }
+      
+      const alpha = isObjectArea ? 255 : 0;
+      const dataIdx = idx * 4;
+      result[dataIdx] = data[dataIdx];
+      result[dataIdx+1] = data[dataIdx+1];
+      result[dataIdx+2] = data[dataIdx+2];
+      result[dataIdx+3] = alpha;
+    }
+  }
+  
+  // Copy edges sebagai alpha channel
+  for(let i = 0; i < data.length; i += 4){
+    data[i] = result[i];
+    data[i+1] = result[i+1];
+    data[i+2] = result[i+2];
+    data[i+3] = result[i+3];
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+}
+
 function sharpenCanvas(ctx, w, h, amount){
   if(amount<=0) return;
   const src=ctx.getImageData(0,0,w,h);
@@ -343,17 +479,34 @@ function sharpenCanvas(ctx, w, h, amount){
 }
 
 function processPhoto(){
-  setStatus('Memproses foto...');
+  const statusMsg = state.bgRemove ? 'Menghapus background dari foto...' : 'Memproses foto...';
+  setStatus(statusMsg);
   const img=new Image();
   img.onload=()=>{
     const scale=state.photoScale;
     const canvas=document.createElement('canvas');
-    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
-    canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    
+    // Dengan zoom/lens, crop dari center foto
+    const srcW = img.naturalWidth * scale;
+    const srcH = img.naturalHeight * scale;
+    const srcX = (img.naturalWidth - srcW) / 2;  // crop dari tengah
+    const srcY = (img.naturalHeight - srcH) / 2;
+    
+    canvas.width=Math.max(1,Math.round(srcW));
+    canvas.height=Math.max(1,Math.round(srcH));
     const ctx=canvas.getContext('2d');
     ctx.filter=[HD_FILTERS[state.hdPhoto], state.hdrPhoto?HDR_FILTER:''].filter(f=>f&&f!=='none').join(' ')||'none';
     ctx.imageSmoothingQuality='high';
-    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    
+    // Draw dengan crop area dari center
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
+    
+    // Hapus background jika diaktifkan
+    if(state.bgRemove){
+      ctx.filter='none';
+      removeBackgroundFromCanvas(ctx, canvas.width, canvas.height);
+    }
+    
     const megapixels=(canvas.width*canvas.height)/1e6;
     const sharpenAmt = SHARPEN_AMOUNT[state.hdPhoto];
     if(sharpenAmt>0 && megapixels<=24){ ctx.filter='none'; sharpenCanvas(ctx, canvas.width, canvas.height, sharpenAmt); }
@@ -361,7 +514,8 @@ function processPhoto(){
       const url=URL.createObjectURL(blob);
       previewImg.classList.add('hidden');
       resultImg.src=url; resultImg.classList.remove('hidden');
-      downloadLink.href=url; downloadLink.download='hd-in-foto.png';
+      const filename = state.bgRemove ? 'hd-in-foto-no-bg.png' : 'hd-in-foto.png';
+      downloadLink.href=url; downloadLink.download=filename;
       resultSheet.classList.add('open');
       setStatus(''); processBtn.disabled=false;
     },'image/png');
@@ -376,38 +530,81 @@ function toGray(sctx, w, h){
   for(let i=0,j=0;i<d.length;i+=4,j++) g[j]=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)|0;
   return g;
 }
-function estimateMotion(prev,curr,w,h,pw,ph,radius){
-  const px0=Math.floor((w-pw)/2), py0=Math.floor((h-ph)/2);
-  let bestSAD=Infinity, bestDx=0, bestDy=0;
-  for(let dy=-radius; dy<=radius; dy++){
-    const sy=py0+dy; if(sy<0||sy+ph>h) continue;
-    for(let dx=-radius; dx<=radius; dx++){
-      const sx=px0+dx; if(sx<0||sx+pw>w) continue;
-      let sad=0;
-      for(let yy=0; yy<ph; yy+=2){
-        const rc=(py0+yy)*w+px0, rp=(sy+yy)*w+sx;
-        for(let xx=0; xx<pw; xx+=2) sad+=Math.abs(curr[rc+xx]-prev[rp+xx]);
+
+// Multi-point motion estimation untuk stabilisasi lebih accurate
+function estimateMotionMultiPoint(prev,curr,w,h){
+  const gridPoints = 6; // lebih banyak points = tracking lebih detail
+  const blockSize = Math.round(Math.min(w,h) / gridPoints);
+  const searchRadius = 32; // lebih besar search range
+  
+  let totalDx = 0, totalDy = 0, validPoints = 0;
+  
+  // Cek motion di berbagai bagian video
+  for(let gy = blockSize/2; gy < h; gy += blockSize){
+    for(let gx = blockSize/2; gx < w; gx += blockSize){
+      const px = Math.round(gx), py = Math.round(gy);
+      const pw = blockSize, ph = blockSize;
+      
+      if(px + pw > w || py + ph > h) continue;
+      
+      let bestSAD = Infinity, bestDx = 0, bestDy = 0;
+      
+      // Search dalam radius yang lebih besar
+      for(let dy = -searchRadius; dy <= searchRadius; dy += 2){
+        const sy = py + dy;
+        if(sy < 0 || sy + ph > h) continue;
+        
+        for(let dx = -searchRadius; dx <= searchRadius; dx += 2){
+          const sx = px + dx;
+          if(sx < 0 || sx + pw > w) continue;
+          
+          let sad = 0;
+          for(let yy = 0; yy < ph; yy += 2){
+            for(let xx = 0; xx < pw; xx += 2){
+              const ci = (py + yy) * w + px + xx;
+              const pi = (sy + yy) * w + sx + xx;
+              sad += Math.abs(curr[ci] - prev[pi]);
+            }
+          }
+          
+          if(sad < bestSAD){
+            bestSAD = sad;
+            bestDx = dx;
+            bestDy = dy;
+          }
+        }
       }
-      if(sad<bestSAD){ bestSAD=sad; bestDx=dx; bestDy=dy; }
+      
+      if(bestSAD < Infinity){
+        totalDx += bestDx;
+        totalDy += bestDy;
+        validPoints++;
+      }
     }
   }
-  return {dx:bestDx, dy:bestDy};
+  
+  // Average motion dari semua points
+  return {
+    dx: validPoints > 0 ? Math.round(totalDx / validPoints) : 0,
+    dy: validPoints > 0 ? Math.round(totalDy / validPoints) : 0
+  };
 }
+
 function analyzeMotion(vid, onProgress){
   return new Promise(resolve=>{
-    const SW=128, SH=Math.max(8, Math.round(128*vid.videoHeight/vid.videoWidth));
+    const SW=192, SH=Math.max(8, Math.round(192*vid.videoHeight/vid.videoWidth)); // lebih besar untuk accuracy
     const sc=document.createElement('canvas'); sc.width=SW; sc.height=SH;
     const sctx=sc.getContext('2d',{willReadFrequently:true});
-    const pw=Math.round(SW*0.4), ph=Math.round(SH*0.4), radius=8;
     let prevGray=null, cumX=0, cumY=0;
     const traj=[];
     vid.currentTime=0; vid.muted=true;
+    
     function step(){
       if(vid.paused||vid.ended){ resolve({traj, scaleX:vid.videoWidth/SW, scaleY:vid.videoHeight/SH}); return; }
       sctx.drawImage(vid,0,0,SW,SH);
       const gray=toGray(sctx,SW,SH);
       if(prevGray){
-        const {dx,dy}=estimateMotion(prevGray,gray,SW,SH,pw,ph,radius);
+        const {dx,dy}=estimateMotionMultiPoint(prevGray,gray,SW,SH);
         cumX+=dx; cumY+=dy;
       }
       traj.push({t:vid.currentTime, x:cumX, y:cumY});
@@ -419,13 +616,58 @@ function analyzeMotion(vid, onProgress){
     vid.play().catch(()=>resolve({traj:[], scaleX:1, scaleY:1}));
   });
 }
+
+// Strong trajectory smoothing dengan outlier rejection
 function smoothTrajectory(traj){
-  const WIN=0.35, n=traj.length, out=new Array(n);
-  for(let i=0;i<n;i++){
+  if(traj.length < 3) return traj;
+  
+  // First pass: outlier detection
+  const smoothed1 = new Array(traj.length);
+  const WIN = 0.5; // lebih lama window untuk smoother result
+  
+  for(let i=0;i<traj.length;i++){
     let sx=0,sy=0,c=0, ti=traj[i].t;
-    for(let j=0;j<n;j++){ if(Math.abs(traj[j].t-ti)<=WIN){ sx+=traj[j].x; sy+=traj[j].y; c++; } }
-    out[i]={t:ti, x:sx/c, y:sy/c};
+    const velocities = [];
+    
+    for(let j=0;j<traj.length;j++){
+      if(Math.abs(traj[j].t-ti) <= WIN){
+        sx+=traj[j].x;
+        sy+=traj[j].y;
+        c++;
+      }
+    }
+    smoothed1[i]={t:ti, x:sx/c, y:sy/c};
   }
+  
+  // Second pass: reject spikes dan apply stronger smoothing
+  const out = new Array(traj.length);
+  const SPIKE_THRESHOLD = 8; // pixel threshold untuk spike detection
+  
+  for(let i=0;i<traj.length;i++){
+    let sumX=0, sumY=0, count=0;
+    const ti = smoothed1[i].t;
+    
+    for(let j=0;j<smoothed1.length;j++){
+      if(Math.abs(smoothed1[j].t-ti) <= WIN){
+        // Check untuk spike
+        let isDx = Math.abs(smoothed1[j].x - smoothed1[i].x) <= SPIKE_THRESHOLD;
+        let isDy = Math.abs(smoothed1[j].y - smoothed1[i].y) <= SPIKE_THRESHOLD;
+        
+        if(isDx && isDy){
+          sumX += smoothed1[j].x;
+          sumY += smoothed1[j].y;
+          count++;
+        }
+      }
+    }
+    
+    out[i] = {
+      t: ti,
+      x: count > 0 ? sumX/count : smoothed1[i].x,
+      y: count > 0 ? sumY/count : smoothed1[i].y
+    };
+  }
+  
   return out;
 }
 function makeSampler(traj){
@@ -460,9 +702,30 @@ async function processVideo(){
   canvas.width=w; canvas.height=h;
   const ctx=canvas.getContext('2d');
   ctx.filter=HD_FILTERS[state.hdVideo];
-  const marginRatio = state.stabilize ? 0.88 : 1;
-  const cw=vid.videoWidth*marginRatio, ch=vid.videoHeight*marginRatio;
-  const baseSx=(vid.videoWidth-cw)/2, baseSy=(vid.videoHeight-ch)/2;
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  
+  // Gunakan full video untuk HD, margin maksimal saat stabilisasi aktif
+  const marginRatio = state.stabilize ? 0.84 : 1.0;
+  let cw=vid.videoWidth*marginRatio, ch=vid.videoHeight*marginRatio;
+  let baseSx=(vid.videoWidth-cw)/2, baseSy=(vid.videoHeight-ch)/2;
+  
+  // Jika video lebih kecil dari canvas, scale up untuk fill penuh tanpa black area
+  const videoAspect = vid.videoWidth / vid.videoHeight;
+  const canvasAspect = w / h;
+  
+  if(videoAspect > canvasAspect){
+    // Video lebih lebar - scale by height
+    ch = vid.videoHeight;
+    cw = ch * videoAspect;
+  } else {
+    // Video lebih tinggi - scale by width
+    cw = vid.videoWidth;
+    ch = cw / videoAspect;
+  }
+  
+  baseSx = (vid.videoWidth - cw) / 2;
+  baseSy = (vid.videoHeight - ch) / 2;
 
   const canvasStream=canvas.captureStream(fps);
   try{
@@ -487,6 +750,27 @@ async function processVideo(){
     setStatus(''); processBtn.disabled=false;
   };
 
+  // Motion buffer untuk smoothing - stabilisasi maksimal dengan aggressive smoothing
+  let motionBuffer = [];
+  const bufferSize = 12; // Lebih banyak frame buffer = lebih smooth
+  let smoothedSx = baseSx, smoothedSy = baseSy;
+  let prevSmoothedSx = baseSx, prevSmoothedSy = baseSy;
+  
+  function smoothMotion(sx, sy){
+    motionBuffer.push({x:sx, y:sy});
+    if(motionBuffer.length > bufferSize) motionBuffer.shift();
+    
+    let sumX = 0, sumY = 0;
+    // Weighted average - recent frames punya weight lebih tinggi
+    for(let i = 0; i < motionBuffer.length; i++){
+      const weight = 1 + (i / motionBuffer.length) * 0.5;
+      sumX += motionBuffer[i].x * weight;
+      sumY += motionBuffer[i].y * weight;
+    }
+    const totalWeight = motionBuffer.length * 1.25;
+    return {x: sumX/totalWeight, y: sumY/totalWeight};
+  }
+  
   function drawFrame(){
     if(vid.paused || vid.ended){ if(recorder.state==='recording') recorder.stop(); return; }
     let sx=baseSx, sy=baseSy;
@@ -495,14 +779,49 @@ async function processVideo(){
       sx=baseSx+p.x*scaleX; sy=baseSy+p.y*scaleY;
       sx=Math.min(Math.max(sx,0), vid.videoWidth-cw);
       sy=Math.min(Math.max(sy,0), vid.videoHeight-ch);
+      
+      // Aplikasikan temporal smoothing untuk mengurangi jitter
+      const smooth = smoothMotion(sx, sy);
+      
+      // Dead zone yang ketat untuk menghilangkan micro-jitter
+      let deltaX = Math.abs(smooth.x - smoothedSx);
+      let deltaY = Math.abs(smooth.y - smoothedSy);
+      const deadZone = 0.15; // Ultra ketat
+      
+      if(deltaX < deadZone) smooth.x = smoothedSx;
+      if(deltaY < deadZone) smooth.y = smoothedSy;
+      
+      // Multi-stage exponential smoothing untuk ultra-stable result
+      const alpha = 0.5; // aggressive smoothing
+      smoothedSx = prevSmoothedSx + alpha * (smooth.x - prevSmoothedSx);
+      smoothedSy = prevSmoothedSy + alpha * (smooth.y - prevSmoothedSy);
+      
+      prevSmoothedSx = smoothedSx;
+      prevSmoothedSy = smoothedSy;
+      
+      sx = Math.round(smoothedSx);
+      sy = Math.round(smoothedSy);
     }
     ctx.drawImage(vid, sx, sy, cw, ch, 0, 0, canvas.width, canvas.height);
+    
+    // Hapus background pada video frame jika diaktifkan
+    if(state.bgRemove){
+      removeBackgroundFromCanvas(ctx, canvas.width, canvas.height);
+    }
+    
     if(vid.duration) progressBar.value = (state.stabilize?45:0) + (vid.currentTime/vid.duration)*(state.stabilize?55:100);
     requestAnimationFrame(drawFrame);
   }
 
   vid.currentTime=0;
-  vid.onplay=()=>{ setStatus(state.stabilize?'Merender video stabil (tahap 2/2)...':'Memproses video...'); recorder.start(200); drawFrame(); };
+  vid.onplay=()=>{ 
+    let statusMsg = 'Memproses video...';
+    if(state.stabilize) statusMsg = 'Merender video stabil (tahap 2/2)...';
+    if(state.bgRemove) statusMsg = statusMsg.replace('Memproses', 'Menghapus background dari');
+    setStatus(statusMsg); 
+    recorder.start(200); 
+    drawFrame(); 
+  };
   vid.onended=()=>{ if(recorder.state==='recording') recorder.stop(); };
   vid.play().catch(()=>{ setStatus('Gagal memutar video sumber.'); processBtn.disabled=false; });
 }
