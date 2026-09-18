@@ -201,6 +201,14 @@ const stabIconBtn=$('stabIconBtn'), hdrIconBtn=$('hdrIconBtn'), hdCycleBtn=$('hd
 const modeStrip=$('modeStrip'), processBtn=$('processBtn'), lensRow=$('lensRow');
 const modeStripWrap=$('modeStripWrap'), bottomBar=$('bottomBar'), emptyBar=$('emptyBar'), galleryCtaBtn=$('galleryCtaBtn');
 
+function updateLivePreview(){
+  if(state.fileType==='video'){
+    previewVideo.style.filter = HD_FILTERS[state.hdVideo];
+  } else if(state.fileType==='image'){
+    const f=[HD_FILTERS[state.hdPhoto], state.hdrPhoto?HDR_FILTER:''].filter(x=>x&&x!=='none').join(' ')||'none';
+    previewImg.style.filter = f;
+  }
+}
 function renderModeStrip(){
   modeStrip.innerHTML='';
   const items = state.fileType==='video' ? RES : HD_LEVELS;
@@ -212,6 +220,7 @@ function renderModeStrip(){
     el.onclick=()=>{
       if(state.fileType==='video') state.mode=it; else state.hdPhoto=it.k;
       renderModeStrip();
+      updateLivePreview();
     };
     modeStrip.appendChild(el);
   });
@@ -228,6 +237,7 @@ function renderModeStrip(){
   } else {
     lensRow.classList.add('hidden');
   }
+  updateLivePreview();
 }
 function refreshTopIcons(){
   if(state.fileType==='video'){
@@ -249,11 +259,12 @@ function refreshHdCycle(){
   }
 }
 stabIconBtn.onclick=()=>{ state.stabilize=!state.stabilize; refreshTopIcons(); };
-hdrIconBtn.onclick=()=>{ state.hdrPhoto=!state.hdrPhoto; refreshTopIcons(); };
+hdrIconBtn.onclick=()=>{ state.hdrPhoto=!state.hdrPhoto; refreshTopIcons(); updateLivePreview(); };
 hdCycleBtn.onclick=()=>{
   const idx=HD_LEVELS.findIndex(x=>x.k===state.hdVideo);
   state.hdVideo = HD_LEVELS[(idx+1)%HD_LEVELS.length].k;
   refreshHdCycle();
+  updateLivePreview();
 };
 
 pickBtn.onclick=()=>fileInput.click();
